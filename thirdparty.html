@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="lv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Domain2 trešās puses tests</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main class="container narrow">
+        <h1>Domain2 iframe testa lapa</h1>
+        <p class="subtitle">
+            Šī lapa ir paredzēta, lai tiktu iegulta kā trešās puses resurss Domain1 lapā.
+        </p>
+
+        <section class="card">
+            <h2>Scenārijs</h2>
+            <div id="modeInfo" class="result-box">Nosaka scenāriju...</div>
+        </section>
+
+        <section class="card">
+            <h2>Sīkdatņu testa rezultāti</h2>
+            <div id="result" class="result-box">Tiek veikts tests...</div>
+        </section>
+
+        <section class="card">
+            <h2>Darbības</h2>
+            <div class="button-group">
+                <button id="setCookieBtn">Palaist testu vēlreiz</button>
+                <button id="sendMessageBtn" class="secondary">Nosūtīt rezultātu vecākam</button>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>Šī brīža document.cookie</h2>
+            <div id="cookieValue" class="result-box">(pārbauda...)</div>
+        </section>
+    </main>
+
+    <script>
+        const resultBox = document.getElementById("result");
+        const cookieValue = document.getElementById("cookieValue");
+        const modeInfo = document.getElementById("modeInfo");
+        const setCookieBtn = document.getElementById("setCookieBtn");
+        const sendMessageBtn = document.getElementById("sendMessageBtn");
+
+        const mode = new URLSearchParams(window.location.search).get("mode") || "js";
+        let lastPayload = {
+            source: "domain2-iframe",
+            mode,
+            status: "not-run",
+            cookie: "",
+            receivedCookieHeader: null,
+            parsedCookieValue: null
+        };
+
+        modeInfo.textContent = mode === "server"
+            ? "Aktīvais scenārijs: trešās puses Set-Cookie"
+            : "Aktīvais scenārijs: trešās puses document.cookie";
+
+        function refreshCookieDisplay() {
+            cookieValue.textContent = document.cookie || "(empty)";
+        }
+
+        async function runJsCookieScenario() {
+            const value = "tp_cookie_" + Date.now();
+
+            try {
+                document.cookie = `tp_iframe_cookie=${value}; path=/; SameSite=None; Secure`;
+                lastPayload = {
+                    source: "domain2-iframe",
+                    mode: "js",
+                    status: "Mēģināts ierakstīt trešās puses sīkdatni ar document.cookie",
+                    cookie: document.cookie || "(empty)",
+                    receivedCookieHeader: null,
+                    parsedCookieValue: null
+                };
+
+                resultBox.textContent =
+                    "Mēģināts ierakstīt trešās puses sīkdatni ar document.cookie.\n" +
+                    `Mēģinātā vērtība: tp_iframe_cookie=${value}\n` +
+                    `Šī brīža document.cookie: ${document.cookie || "(empty)"}`;
+            } catch (error) {
+                lastPayload = {
+                    source: "domain2-iframe",
+                    mode: "js",
+                    status: `Neizdevās ierakstīt sīkdatni: ${error.message}`,
+                    cookie: document.cookie || "(empty)",
+                    receivedCookieHeader: null,
+                    parsedCookieValue: null
+                };
+
+                resultBox.textContent =
+                    "Neizdevās ierakstīt trešās puses sīkdatni ar document.cookie.\n" +
+                    `Iemesls: ${error.message}`;
+            }
+
+            refreshCookieDisplay();
+        }
+
+        async function runServerCookieScenario() {
+            const testId = "tp_server_" + Date.now();
+
+            try {
+                const setResponse = await fetch(`/api/set-third-cookie?test_id=${encodeURIComponent(testId)}`, {
+                    method: "GET",
+                    credentials: "include"
+                });
+                const setData = await setResponse.json();
+
+                const showResponse = await fetch("/api/show-third-cookie", {
+                    method: "GET",
+                    credentials: "include"
+                });
+                const showData = await showResponse.json();
+
+                lastPayload = {
+                    source: "domain2-iframe",
+                    mode: "server",
+                    status: "Trešās puses Set-Cookie scenārijs izpildīts",
+                    cookie: document.cookie || "(empty)",
+                    receivedCookieHeader: showData.receivedCookieHeader || null,
+                    parsedCookieValue: showData.parsedCookieValue || null
+                };
+
+                resultBox.textContent =
+                    "Trešās puses Set-Cookie scenārijs izpildīts.\n" +
+                    `Set endpoint statuss: ${setResponse.status}\n` +
+                    `Iestatītā vērtība: ${setData.cookieValue || "(nav)"}\n` +
+                    `Show endpoint statuss: ${showResponse.status}\n` +
+                    `Serveris saņēma Cookie galveni: ${showData.receivedCookieHeader || "(nav)"}\n` +
+                    `Serveris redz tp_cookie_server: ${showData.parsedCookieValue || "(nav)"}`;
+            } catch (error) {
+                lastPayload = {
+                    source: "domain2-iframe",
+                    mode: "server",
+                    status: `Trešās puses Set-Cookie scenārijs neizdevās: ${error.message}`,
+                    cookie: document.cookie || "(empty)",
+                    receivedCookieHeader: null,
+                    parsedCookieValue: null
+                };
+
+                resultBox.textContent =
+                    "Trešās puses Set-Cookie scenārijs neizdevās.\n" +
+                    `Iemesls: ${error.message}`;
+            }
+
+            refreshCookieDisplay();
+        }
+
+        function sendMessageToParent() {
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage(lastPayload, "*");
+            }
+        }
+
+        async function runScenario() {
+            if (mode === "server") {
+                await runServerCookieScenario();
+            } else {
+                await runJsCookieScenario();
+            }
+            sendMessageToParent();
+        }
+
+        setCookieBtn.addEventListener("click", runScenario);
+        sendMessageBtn.addEventListener("click", sendMessageToParent);
+
+        runScenario();
+    </script>
+</body>
+</html>

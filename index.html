@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Domain2 Izsekošanas Vide</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main class="container">
+        <h1>Domain2 Izsekošanas Vide</h1>
+        <p class="subtitle">
+            Šis ir Domain2 testēšanas lapas sākums, kas paredzēta, lai pārbaudītu trešo pušu sīkfailu uzvedību, kad tā tiek iegultā Domain1 lapā kā iframe. Lūdzu, izmantojiet zemāk esošās saites, lai piekļūtu resursiem un veiktu testus.
+        </p>
+
+    <section class="card">
+        <h2>Pieejamie resursi</h2>
+        <ul>
+            <li><a href="thirdparty.html">Atvērt thirdparty.html</a></li>
+            <li><a href="tracker.js">Atvērt tracker.js</a></li>
+        </ul>
+    </section>
+
+    <section class="card">
+        <h2>Šobrīdējais sīkdatņu stāvoklis</h2>
+        <div id="cookieOutput" class="result-box">(pārbauda...)</div>
+    </section>
+    </main>
+
+    <script>
+        const cookieOutput = document.getElementById("cookieOutput");
+        cookieOutput.textContent = document.cookie || "(empty)";
+    </script>
+</body>
+</html>
