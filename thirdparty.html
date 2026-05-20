@@ -51,12 +51,23 @@
             status: "not-run",
             cookie: "",
             receivedCookieHeader: null,
-            parsedCookieValue: null
+            parsedCookieValue: null,
+            hasStorageAccess: undefined,
+            requestStorageAccessSupported: undefined,
+            requestStorageAccessResult: null
         };
 
-        modeInfo.textContent = mode === "server"
-            ? "Aktīvais scenārijs: trešās puses Set-Cookie"
-            : "Aktīvais scenārijs: trešās puses document.cookie";
+        const modeTextMap = {
+            server: "Aktīvais scenārijs: trešās puses Set-Cookie",
+            js: "Aktīvais scenārijs: trešās puses document.cookie",
+            chips: "Aktīvais scenārijs: trešās puses CHIPS / Partitioned Cookies",
+            "storage-access": "Aktīvais scenārijs: Storage Access API"
+        };
+
+        modeInfo.textContent = modeTextMap[mode] || `Aktīvais scenārijs: ${mode}`;
+        if (mode === "storage-access") {
+            setCookieBtn.textContent = "Pieprasīt Storage Access";
+        }
 
         function refreshCookieDisplay() {
             cookieValue.textContent = document.cookie || "(empty)";
@@ -68,6 +79,7 @@
             try {
                 document.cookie = `tp_iframe_cookie=${value}; path=/; SameSite=None; Secure`;
                 lastPayload = {
+                    ...lastPayload,
                     source: "domain2-iframe",
                     mode: "js",
                     status: "Mēģināts ierakstīt trešās puses sīkdatni ar document.cookie",
@@ -77,11 +89,12 @@
                 };
 
                 resultBox.textContent =
-                    "Mēģināts ierakstīt trešās puses sīkdatni ar document.cookie.\n" +
-                    `Mēģinātā vērtība: tp_iframe_cookie=${value}\n` +
+                    "Mēģināts ierakstīt trešās puses sīkdatni ar document.cookie." +
+                    `Mēģinātā vērtība: tp_iframe_cookie=${value}` +
                     `Šī brīža document.cookie: ${document.cookie || "(empty)"}`;
             } catch (error) {
                 lastPayload = {
+                    ...lastPayload,
                     source: "domain2-iframe",
                     mode: "js",
                     status: `Neizdevās ierakstīt sīkdatni: ${error.message}`,
@@ -91,7 +104,7 @@
                 };
 
                 resultBox.textContent =
-                    "Neizdevās ierakstīt trešās puses sīkdatni ar document.cookie.\n" +
+                    "Neizdevās ierakstīt trešās puses sīkdatni ar document.cookie." +
                     `Iemesls: ${error.message}`;
             }
 
@@ -106,9 +119,7 @@
                     method: "GET",
                     credentials: "include"
                 });
-                const setText = await setResponse.text();
-                console.log("set-first-cookie raw response:", setText);
-                const setData = JSON.parse(setText);
+                const setData = await setResponse.json();
 
                 const showResponse = await fetch("/api/show-third-cookie", {
                     method: "GET",
@@ -117,6 +128,7 @@
                 const showData = await showResponse.json();
 
                 lastPayload = {
+                    ...lastPayload,
                     source: "domain2-iframe",
                     mode: "server",
                     status: "Trešās puses Set-Cookie scenārijs izpildīts",
@@ -126,14 +138,15 @@
                 };
 
                 resultBox.textContent =
-                    "Trešās puses Set-Cookie scenārijs izpildīts.\n" +
-                    `Set endpoint statuss: ${setResponse.status}\n` +
-                    `Iestatītā vērtība: ${setData.cookieValue || "(nav)"}\n` +
-                    `Show endpoint statuss: ${showResponse.status}\n` +
-                    `Serveris saņēma Cookie galveni: ${showData.receivedCookieHeader || "(nav)"}\n` +
+                    "Trešās puses Set-Cookie scenārijs izpildīts." +
+                    `Set endpoint statuss: ${setResponse.status}` +
+                    `Iestatītā vērtība: ${setData.cookieValue || "(nav)"}` +
+                    `Show endpoint statuss: ${showResponse.status}` +
+                    `Serveris saņēma Cookie galveni: ${showData.receivedCookieHeader || "(nav)"}` +
                     `Serveris redz tp_cookie_server: ${showData.parsedCookieValue || "(nav)"}`;
             } catch (error) {
                 lastPayload = {
+                    ...lastPayload,
                     source: "domain2-iframe",
                     mode: "server",
                     status: `Trešās puses Set-Cookie scenārijs neizdevās: ${error.message}`,
@@ -143,7 +156,131 @@
                 };
 
                 resultBox.textContent =
-                    "Trešās puses Set-Cookie scenārijs neizdevās.\n" +
+                    "Trešās puses Set-Cookie scenārijs neizdevās." +
+                    `Iemesls: ${error.message}`;
+            }
+
+            refreshCookieDisplay();
+        }
+
+        async function runChipsScenario() {
+            const testId = "chips_" + Date.now();
+
+            try {
+                const setResponse = await fetch(`/api/set-third-cookie-chips?test_id=${encodeURIComponent(testId)}`, {
+                    method: "GET",
+                    credentials: "include"
+                });
+                const setData = await setResponse.json();
+
+                const showResponse = await fetch("/api/show-third-cookie-chips", {
+                    method: "GET",
+                    credentials: "include"
+                });
+                const showData = await showResponse.json();
+
+                lastPayload = {
+                    ...lastPayload,
+                    source: "domain2-iframe",
+                    mode: "chips",
+                    status: "Trešās puses CHIPS scenārijs izpildīts",
+                    cookie: document.cookie || "(empty)",
+                    receivedCookieHeader: showData.receivedCookieHeader || null,
+                    parsedCookieValue: showData.parsedCookieValue || null
+                };
+
+                resultBox.textContent =
+                    "Trešās puses CHIPS scenārijs izpildīts." +
+                    `Set endpoint statuss: ${setResponse.status}` +
+                    `Iestatītā vērtība: ${setData.cookieValue || "(nav)"}` +
+                    `Show endpoint statuss: ${showResponse.status}` +
+                    `Serveris saņēma Cookie galveni: ${showData.receivedCookieHeader || "(nav)"}` +
+                    `Serveris redz tp_cookie_partitioned: ${showData.parsedCookieValue || "(nav)"}`;
+            } catch (error) {
+                lastPayload = {
+                    ...lastPayload,
+                    source: "domain2-iframe",
+                    mode: "chips",
+                    status: `Trešās puses CHIPS scenārijs neizdevās: ${error.message}`,
+                    cookie: document.cookie || "(empty)",
+                    receivedCookieHeader: null,
+                    parsedCookieValue: null
+                };
+
+                resultBox.textContent =
+                    "Trešās puses CHIPS scenārijs neizdevās." +
+                    `Iemesls: ${error.message}`;
+            }
+
+            refreshCookieDisplay();
+        }
+
+        async function runStorageAccessScenario() {
+            const supportsHasStorageAccess = typeof document.hasStorageAccess === "function";
+            const supportsRequestStorageAccess = typeof document.requestStorageAccess === "function";
+
+            let hasAccessBefore = "nav atbalsta";
+            let requestResult = "nav izsaukts";
+            let showData = null;
+
+            try {
+                if (supportsHasStorageAccess) {
+                    hasAccessBefore = await document.hasStorageAccess();
+                }
+
+                if (supportsRequestStorageAccess) {
+                    await document.requestStorageAccess();
+                    requestResult = "piešķirta vai pieprasījums izpildīts veiksmīgi";
+                } else {
+                    requestResult = "nav atbalsta";
+                }
+
+                const showResponse = await fetch("/api/show-storage-access-cookie", {
+                    method: "GET",
+                    credentials: "include"
+                });
+                showData = await showResponse.json();
+
+                lastPayload = {
+                    ...lastPayload,
+                    source: "domain2-iframe",
+                    mode: "storage-access",
+                    status: "Storage Access API scenārijs izpildīts",
+                    cookie: document.cookie || "(empty)",
+                    receivedCookieHeader: showData.receivedCookieHeader || null,
+                    parsedCookieValue: showData.parsedCookieValue || null,
+                    hasStorageAccess: hasAccessBefore,
+                    requestStorageAccessSupported: supportsRequestStorageAccess,
+                    requestStorageAccessResult: requestResult
+                };
+
+                resultBox.textContent =
+                    "Storage Access API scenārijs izpildīts." +
+                    `document.hasStorageAccess atbalsts: ${supportsHasStorageAccess}` +
+                    `Piekļuve pirms pieprasījuma: ${hasAccessBefore}` +
+                    `requestStorageAccess atbalsts: ${supportsRequestStorageAccess}` +
+                    `requestStorageAccess rezultāts: ${requestResult}` +
+                    `Serveris saņēma Cookie galveni: ${showData?.receivedCookieHeader || "(nav)"}` +
+                    `Serveris redz saa_cookie: ${showData?.parsedCookieValue || "(nav)"}`;
+            } catch (error) {
+                lastPayload = {
+                    ...lastPayload,
+                    source: "domain2-iframe",
+                    mode: "storage-access",
+                    status: `Storage Access API scenārijs neizdevās: ${error.message}`,
+                    cookie: document.cookie || "(empty)",
+                    receivedCookieHeader: showData?.receivedCookieHeader || null,
+                    parsedCookieValue: showData?.parsedCookieValue || null,
+                    hasStorageAccess: hasAccessBefore,
+                    requestStorageAccessSupported: supportsRequestStorageAccess,
+                    requestStorageAccessResult: error.message
+                };
+
+                resultBox.textContent =
+                    "Storage Access API scenārijs neizdevās." +
+                    `document.hasStorageAccess atbalsts: ${supportsHasStorageAccess}` +
+                    `Piekļuve pirms pieprasījuma: ${hasAccessBefore}` +
+                    `requestStorageAccess atbalsts: ${supportsRequestStorageAccess}` +
                     `Iemesls: ${error.message}`;
             }
 
@@ -156,19 +293,26 @@
             }
         }
 
-        async function runScenario() {
+        async function runScenario(autoSend = true) {
             if (mode === "server") {
                 await runServerCookieScenario();
+            } else if (mode === "chips") {
+                await runChipsScenario();
+            } else if (mode === "storage-access") {
+                await runStorageAccessScenario();
             } else {
                 await runJsCookieScenario();
             }
-            sendMessageToParent();
+
+            if (autoSend) {
+                sendMessageToParent();
+            }
         }
 
-        setCookieBtn.addEventListener("click", runScenario);
+        setCookieBtn.addEventListener("click", () => runScenario(true));
         sendMessageBtn.addEventListener("click", sendMessageToParent);
 
-        runScenario();
+        runScenario(mode !== "storage-access");
     </script>
 </body>
 </html>
