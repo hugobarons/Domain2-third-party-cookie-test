@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="lv">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,19 +17,61 @@
         <h2>Pieejamie resursi</h2>
         <ul>
             <li><a href="thirdparty.html">Atvērt thirdparty.html</a></li>
+            <li><a href="thirdparty.html?mode=chips">Atvērt CHIPS testu</a></li>
+            <li><a href="thirdparty.html?mode=storage-access">Atvērt Storage Access API testu</a></li>
             <li><a href="tracker.js">Atvērt tracker.js</a></li>
         </ul>
     </section>
 
-    <section class="card">
-        <h2>Šobrīdējais sīkdatņu stāvoklis</h2>
-        <div id="cookieOutput" class="result-box">(pārbauda...)</div>
-    </section>
+        <section class="card">
+            <h2>Storage Access API sagatavošana</h2>
+            <p class="subtitle">Šo pogu ieteicams izmantot, ja vēlaties sagatavot Domain2 first-party sīkdatni pirms Storage Access API testa iframe vidē.</p>
+            <div class="button-group">
+                <button id="prepareStorageAccessBtn">Iestatīt Storage Access testa sīkdatni</button>
+            </div>
+            <div id="storageAccessSetupOutput" class="result-box">Sīkdatne vēl nav sagatavota.</div>
+        </section>
+
+        <section class="card">
+            <h2>Šobrīdējais sīkdatņu stāvoklis</h2>
+            <div id="cookieOutput" class="result-box">(pārbauda...)</div>
+        </section>
     </main>
 
     <script>
         const cookieOutput = document.getElementById("cookieOutput");
-        cookieOutput.textContent = document.cookie || "(empty)";
+        const storageAccessSetupOutput = document.getElementById("storageAccessSetupOutput");
+        const prepareStorageAccessBtn = document.getElementById("prepareStorageAccessBtn");
+
+        function refreshCookieOutput() {
+            cookieOutput.textContent = document.cookie || "(empty)";
+        }
+
+        async function prepareStorageAccessCookie() {
+            const testId = "saa_" + Date.now();
+
+            try {
+                const response = await fetch(`/api/set-storage-access-cookie?test_id=${encodeURIComponent(testId)}`, {
+                    method: "GET",
+                    credentials: "include"
+                });
+                const data = await response.json();
+
+                storageAccessSetupOutput.textContent =
+                    "Storage Access API sagatavošanas sīkdatne iestatīta." +
+                    `Set endpoint statuss: ${response.status}` +
+                    `Vērtība: ${data.cookieValue || "(nav)"}`;
+            } catch (error) {
+                storageAccessSetupOutput.textContent =
+                    "Neizdevās iestatīt Storage Access API sagatavošanas sīkdatni." +
+                    `Iemesls: ${error.message}`;
+            }
+
+            refreshCookieOutput();
+        }
+
+        prepareStorageAccessBtn.addEventListener("click", prepareStorageAccessCookie);
+        refreshCookieOutput();
     </script>
 </body>
 </html>
